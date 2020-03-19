@@ -1,0 +1,27 @@
+image: python:3.7.3
+
+pipelines:
+  default:
+    - step:
+        name: "Build"
+        caches:
+          - pip
+        script:
+          - pip install -r requirements.txt
+          - $LADGER_NAME > ledger.txt
+          - $REQUEST_TOKEN > token.txt
+          - git archive --format=zip HEAD:. > deploy.zip
+    - step:
+        name: "Deploy"
+        deployment: production
+          trigger: manual
+          script:
+            - pipe: atlassian/aws-elasticbeanstalk-deploy:0.5.0
+              variables:
+                AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                APPLICATION_NAME: $APPLICATION_NAME
+                ENVIRONMENT_NAME: $ENVIRONMENT_NAME
+                S3_BUCKET: $S3_BUCKET
+                AWS_DEFAULT_REGION: "eu-central-1"
+                ZIP_FILE: "deploy.zip"
