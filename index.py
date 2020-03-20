@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, abort, Response
 import json
 from amazon.ion.simpleion import dumps, loads
 from qldb_sesssion import session
@@ -17,7 +17,7 @@ def tables():
         for table in qldb_session.list_tables():
             tables.append(table)
     except Exception as e:
-        return jsonify(error=400, exception='QLDB error: ' + str(e))
+        return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
     return json.dumps(tables)
 
@@ -25,7 +25,7 @@ def tables():
 @app.route('/table/<name>/documents', methods=["GET"])
 def table_documents(name):
     if len(name) == 0:
-        return jsonify(error=400, exception='Table name is required')
+        return Response(u'Table name is required', mimetype='text/plain', status=400)
 
     query = "SELECT * FROM {}"
     query = query.format(name)
@@ -34,25 +34,25 @@ def table_documents(name):
         qldb_session = session()
         cursor = qldb_session.execute_statement(query)
     except Exception as e:
-        return jsonify(error=400, exception='QLDB error: ' + str(e))
+        return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
     result = []
 
     for row in cursor:
-        result.append(dumps(row, binary=False, indent='  ', omit_version_marker=True))
+        result.append(dumps(row, binary=False, omit_version_marker=True))
 
-    return jsonify(documents=result)
+    return jsonify(result)
 
 
 @app.route('/table/<name>/document', methods=["POST"])
 def insert_data(name):
     if len(name) == 0:
-        return jsonify(error=400, exception='Table name is required')
+        return Response(u'Table name is required', mimetype='text/plain', status=400)
 
     data = request.get_json()
 
     if data is None:
-        return jsonify(error=400, exception='Insert data is required')
+        return Response(u'Insert data is required', mimetype='text/plain', status=400)
 
     statement = 'INSERT INTO {} ?'.format(name)
 
@@ -60,7 +60,7 @@ def insert_data(name):
         qldb_session = session()
         cursor = qldb_session.execute_statement(statement, loads(dumps(data)))
     except Exception as e:
-        return jsonify(error=400, exception='QLDB error: ' + str(e))
+        return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
     ret_val = list(map(lambda x: x.get('documentId'), cursor))
 
@@ -74,10 +74,10 @@ def insert_data(name):
 @app.route('/table/<name>/document/<id>', methods=["GET"])
 def get_document(name, id):
     if len(name) == 0:
-        return jsonify(error=400, exception='Table name is required')
+        return Response(u'Table name is required', mimetype='text/plain', status=400)
 
     if len(id) == 0:
-        return jsonify(error=400, exception='Document id is required')
+        return Response(u'Document id is required', mimetype='text/plain', status=400)
 
     query = "SELECT rid, r.* FROM {} AS r BY rid WHERE rid = ?"
     query = query.format(name)
@@ -86,8 +86,7 @@ def get_document(name, id):
         qldb_session = session()
         cursor = qldb_session.execute_statement(query, id)
     except Exception as e:
-        return jsonify(error=400, exception='QLDB error: ' + str(e))
-
+        return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
     result = []
 
@@ -100,15 +99,15 @@ def get_document(name, id):
 @app.route('/table/<name>/document/<id>', methods=["PUT"])
 def update_document(name, id):
     if len(name) == 0:
-        return jsonify(error=400, exception='Table name is required')
+        return Response(u'Table name is required', mimetype='text/plain', status=400)
 
     if len(id) == 0:
-        return jsonify(error=400, exception='Document id is required')
+        return Response(u'Document id is required', mimetype='text/plain', status=400)
 
     data = request.get_json()
 
     if data is None:
-        return jsonify(error=400, exception='Update data is required')
+        return Response(u'Update data is required', mimetype='text/plain', status=400)
 
     query = "UPDATE {} AS p BY rid SET p = {} WHERE rid = ?".format(name, data)
 
@@ -116,7 +115,7 @@ def update_document(name, id):
         qldb_session = session()
         cursor = qldb_session.execute_statement(query, id)
     except Exception as e:
-        return jsonify(error=400, exception='QLDB error: ' + str(e))
+        return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
     result = []
 
@@ -129,7 +128,7 @@ def update_document(name, id):
 @app.route('/table/<name>', methods=["POST"])
 def create_table(name):
     if len(name) == 0:
-        return jsonify(error=400, exception='Table name is required')
+        return Response(u'Table name is required', mimetype='text/plain', status=400)
 
     indexes = request.get_json()
 
@@ -143,7 +142,7 @@ def create_table(name):
                 statement = 'CREATE INDEX on {} ({})'.format(name, index)
                 qldb_session.execute_statement(statement)
     except Exception as e:
-        return jsonify(error=400, exception='QLDB error: ' + str(e))
+        return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
     return ''
 
@@ -151,7 +150,7 @@ def create_table(name):
 @app.route('/table/<name>', methods=["DELETE"])
 def delete_table(name):
     if len(name) == 0:
-        return jsonify(error=400, exception='Table name is required')
+        return Response(u'Table name is required', mimetype='text/plain', status=400)
 
     statement = 'DROP TABLE {}'.format(name)
 
@@ -159,7 +158,7 @@ def delete_table(name):
         qldb_session = session()
         qldb_session.execute_statement(statement)
     except Exception as e:
-        return jsonify(error=400, exception='QLDB error: ' + str(e))
+        return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
     return ''
 
