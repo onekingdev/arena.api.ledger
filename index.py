@@ -59,16 +59,29 @@ def insert_data(name):
     try:
         qldb_session = session()
         cursor = qldb_session.execute_statement(statement, loads(dumps(data)))
+        ret_val = list(map(lambda x: x.get('documentId'), cursor))
+
+        if len(ret_val) == 0:
+            return jsonify(error=404, exception='Document id not found')
+
+        id = ret_val[0]
+        query = "SELECT id, r.blockAddress, r.hash, r.metadata FROM _ql_committed_{} AS r BY id WHERE rid = ?"
+
+        query = query.format(name)
+        last_element = qldb_session.execute_statement(query, id)
+
+        result = []
+
+        for row in last_element:
+            result.append(dumps(row, binary=False, omit_version_marker=True))
+
+        if len(result) == 1:
+            result = result[0]
+
     except Exception as e:
         return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
-    ret_val = list(map(lambda x: x.get('documentId'), cursor))
-
-
-    if len(ret_val) == 0:
-        return jsonify(error=404, exception='Document id not found')
-
-    return jsonify(id=ret_val[0])
+    return jsonify(result)
 
 
 @app.route('/table/<name>/document/<id>', methods=["GET"])
@@ -79,8 +92,10 @@ def get_document(name, id):
     if len(id) == 0:
         return Response(u'Document id is required', mimetype='text/plain', status=400)
 
-    query = "SELECT rid, r.* FROM {} AS r BY rid WHERE rid = ?"
-    query = query.format(name)
+    query = "SELECT rid, r.*, m.blockAddress, m.hash, m.metadata FROM {} AS r BY rid " \
+            "INNER JOIN _ql_committed_{} AS m BY mid ON rid = mid " \
+            "WHERE rid = ?"
+    query = query.format(name, name)
 
     try:
         qldb_session = session()
@@ -92,6 +107,9 @@ def get_document(name, id):
 
     for row in cursor:
         result.append(dumps(row, binary=False, omit_version_marker=True))
+
+    if len(result) == 1:
+        result = result[0]
 
     return json.dumps(result)
 
