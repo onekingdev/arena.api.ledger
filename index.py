@@ -111,7 +111,24 @@ def get_document(name, id):
     if len(result) == 1:
         result = result[0]
 
-    return json.dumps(result)
+    history_query = "SELECT * FROM history( {} ) AS h WHERE h.metadata.id = ?"
+    history_query = history_query.format(name)
+
+    try:
+        history_cursor = qldb_session.execute_statement(history_query, id)
+    except Exception as e:
+        return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
+
+    history = []
+
+    for row in history_cursor:
+        history.append(dumps(row, binary=False, omit_version_marker=True))
+
+    response = dict()
+    response['document'] = result
+    response['history'] = history
+
+    return json.dumps(response)
 
 
 @app.route('/table/<name>/document/<id>', methods=["PUT"])
@@ -127,11 +144,35 @@ def update_document(name, id):
     if data is None:
         return Response(u'Update data is required', mimetype='text/plain', status=400)
 
-    query = "UPDATE {} AS p BY rid SET p = {} WHERE rid = ?".format(name, data)
+    select_query = "SELECT r.* FROM {} AS r BY rid WHERE rid = ?".format(name)
 
     try:
         qldb_session = session()
-        cursor = qldb_session.execute_statement(query, id)
+        selected = qldb_session.execute_statement(select_query, id)
+
+        result = []
+
+        for row in selected:
+            t = loads(dumps(row, binary=False, omit_version_marker=True))
+            result.append(t)
+
+        if len(result) == 1:
+            result = result[0]
+
+            processed_result = dict()
+
+            for res in result:
+                processed_result[res] = str(result[res])
+
+            for field in data:
+                processed_result[field] = data[field]
+
+            data = processed_result
+
+        data = loads(dumps(data))
+
+        query = "UPDATE {} AS p BY rid SET p = ? WHERE rid = ?".format(name)
+        cursor = qldb_session.execute_statement(query, data, id)
     except Exception as e:
         return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
