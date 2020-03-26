@@ -1,8 +1,9 @@
 from flask import Flask, request, jsonify, abort, Response
 import json
-from amazon.ion.simpleion import dumps, loads
+from amazon.ion.simpleion import dumps, loads, IonType
 from qldb_sesssion import session
 from middlewate import Middleware
+import re
 
 app = Flask(__name__)
 app.wsgi_app = Middleware(app.wsgi_app)
@@ -39,7 +40,7 @@ def table_documents(name):
     result = []
 
     for row in cursor:
-        result.append(dumps(row, binary=False, omit_version_marker=True))
+        result.append(parse_ion(loads(dumps(row, binary=False, omit_version_marker=True))))
 
     return jsonify(result)
 
@@ -65,7 +66,7 @@ def insert_data(name):
             return jsonify(error=404, exception='Document id not found')
 
         id = ret_val[0]
-        query = "SELECT id, r.blockAddress, r.hash, r.metadata FROM _ql_committed_{} AS r BY id WHERE rid = ?"
+        query = "SELECT id, r.blockAddress, r.hash, r.metadata FROM _ql_committed_{} AS r BY id WHERE id = ?"
 
         query = query.format(name)
         last_element = qldb_session.execute_statement(query, id)
@@ -73,8 +74,8 @@ def insert_data(name):
         result = []
 
         for row in last_element:
-            result.append(dumps(row, binary=False, omit_version_marker=True))
-
+            result.append(parse_ion(loads(dumps(row, binary=False, omit_version_marker=True))))
+        print(result)
         if len(result) == 1:
             result = result[0]
 
@@ -106,7 +107,7 @@ def get_document(name, id):
     result = []
 
     for row in cursor:
-        result.append(dumps(row, binary=False, omit_version_marker=True))
+        result.append(parse_ion(loads(dumps(row, binary=False, omit_version_marker=True))))
 
     if len(result) == 1:
         result = result[0]
@@ -122,7 +123,7 @@ def get_document(name, id):
     history = []
 
     for row in history_cursor:
-        history.append(dumps(row, binary=False, omit_version_marker=True))
+        history.append(parse_ion(loads(dumps(row, binary=False, omit_version_marker=True))))
 
     response = dict()
     response['document'] = result
@@ -153,8 +154,8 @@ def update_document(name, id):
         result = []
 
         for row in selected:
-            t = loads(dumps(row, binary=False, omit_version_marker=True))
-            result.append(t)
+            parsed_selected = loads(dumps(row, binary=False, omit_version_marker=True))
+            result.append(parsed_selected)
 
         if len(result) == 1:
             result = result[0]
@@ -179,7 +180,7 @@ def update_document(name, id):
     result = []
 
     for row in cursor:
-        result.append(dumps(row, binary=False, omit_version_marker=True))
+        result.append(parse_ion(loads(dumps(row, binary=False, omit_version_marker=True))))
 
     return json.dumps(result)
 
@@ -220,6 +221,23 @@ def delete_table(name):
         return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
     return ''
+
+
+def parse_ion(ion_object):
+    parsed = dict()
+
+    for field in ion_object:
+        if ion_object[field].__dict__['ion_type'] == IonType.STRUCT:
+            parsed[field] = parse_ion(ion_object[field])
+        elif ion_object[field].__dict__['ion_type'] == IonType.BLOB:
+            hash_str = re.search('{{(.*)}}', dumps(ion_object[field], binary=False))
+
+            if hash_str:
+                parsed[field] = hash_str.group(1)
+        else:
+            parsed[field] = str(ion_object[field])
+
+    return parsed
 
 
 if __name__ == '__main__':
