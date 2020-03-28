@@ -28,8 +28,14 @@ def table_documents(name):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
 
-    query = "SELECT * FROM {}"
-    query = query.format(name)
+    data = request.args.get('fields')
+
+    if data is None or len(data) == 0:
+        select_data = "*"
+    else:
+        select_data = data
+
+    query = "SELECT {} FROM {}".format(select_data, name)
 
     try:
         qldb_session = session()
@@ -75,7 +81,7 @@ def insert_data(name):
 
         for row in last_element:
             result.append(parse_ion(loads(dumps(row, binary=False, omit_version_marker=True))))
-        print(result)
+
         if len(result) == 1:
             result = result[0]
 
@@ -93,11 +99,24 @@ def get_document(name, id):
     if len(id) == 0:
         return Response(u'Document id is required', mimetype='text/plain', status=400)
 
-    query = "SELECT rid, r.*, m.blockAddress, m.hash, m.metadata FROM {} AS r BY rid " \
+    data = request.args.get('fields')
+
+    if data is None or len(data) == 0:
+        select_data = "r.*"
+    else:
+        data = data.split(',')
+        formatted_data = list()
+
+        for field in data:
+            formatted_data.append("r." + field.strip())
+
+        select_data = ', '.join(formatted_data)
+
+    query = "SELECT rid, {}, m.blockAddress, m.hash, m.metadata FROM {} AS r BY rid " \
             "INNER JOIN _ql_committed_{} AS m BY mid ON rid = mid " \
             "WHERE rid = ?"
-    query = query.format(name, name)
-
+    query = query.format(select_data, name, name)
+    print(query)
     try:
         qldb_session = session()
         cursor = qldb_session.execute_statement(query, id)
@@ -129,8 +148,8 @@ def get_document(name, id):
     response['document'] = result
     response['history'] = history
 
-    return json.dumps(response)
-
+    # return json.dumps(response)
+    return Response(json.dumps(response), mimetype='application/json')
 
 @app.route('/table/<name>/document/<id>', methods=["PUT"])
 def update_document(name, id):
