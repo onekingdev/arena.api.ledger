@@ -116,7 +116,7 @@ def get_document(name, id):
             "INNER JOIN _ql_committed_{} AS m BY mid ON rid = mid " \
             "WHERE rid = ?"
     query = query.format(select_data, name, name)
-    print(query)
+
     try:
         qldb_session = session()
         cursor = qldb_session.execute_statement(query, id)
