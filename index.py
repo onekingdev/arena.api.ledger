@@ -151,6 +151,7 @@ def get_document(name, id):
     # return json.dumps(response)
     return Response(json.dumps(response), mimetype='application/json')
 
+
 @app.route('/table/<name>/document/<id>', methods=["PUT"])
 def update_document(name, id):
     if len(name) == 0:
@@ -213,6 +214,20 @@ def create_table(name):
 
     try:
         qldb_session = session()
+        dropped_tables_query = "select * from information_schema.user_tables where name = '{}' " \
+                               "and status = 'INACTIVE'".format(name)
+        schema_tables = qldb_session.execute_statement(dropped_tables_query)
+
+        result = []
+
+        for row in schema_tables:
+            parsed_selected = loads(dumps(row, binary=False, omit_version_marker=True))
+            result.append(parsed_selected)
+            qldb_session.execute_statement("UNDROP TABLE '{}'".format(parsed_selected["tableId"]))
+
+        if len(result) > 0:
+            return ''
+
         statement = 'CREATE TABLE {}'.format(name)
         qldb_session.execute_statement(statement)
 
@@ -236,6 +251,19 @@ def delete_table(name):
     try:
         qldb_session = session()
         qldb_session.execute_statement(statement)
+    except Exception as e:
+        return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
+
+    return ''
+
+
+@app.route('/tables', methods=["DELETE"])
+def delete_all_tables():
+    try:
+        qldb_session = session()
+        for table in qldb_session.list_tables():
+            statement = 'DROP TABLE {}'.format(str(table))
+            qldb_session.execute_statement(statement)
     except Exception as e:
         return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
