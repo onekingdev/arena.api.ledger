@@ -31,11 +31,13 @@ def table_documents(name):
     data = request.args.get('fields')
 
     if data is None or len(data) == 0:
-        select_data = "*"
+        select_data = "r.*"
     else:
         select_data = data
 
-    query = "SELECT {} FROM {}".format(select_data, name)
+    query = "SELECT id, r.blockAddress, r.hash, r.metadata, r.data FROM _ql_committed_{} AS r BY id "
+
+    query = query.format(name)
 
     try:
         qldb_session = session()
@@ -72,7 +74,7 @@ def insert_data(name):
             return jsonify(error=404, exception='Document id not found')
 
         id = ret_val[0]
-        query = "SELECT id, r.blockAddress, r.hash, r.metadata FROM _ql_committed_{} AS r BY id WHERE id = ?"
+        query = "SELECT id, r.blockAddress, r.hash, r.metadata, r.data FROM _ql_committed_{} AS r BY id WHERE id = ?"
 
         query = query.format(name)
         last_element = qldb_session.execute_statement(query, id)
@@ -202,7 +204,23 @@ def update_document(name, id):
     for row in cursor:
         result.append(parse_ion(loads(dumps(row, binary=False, omit_version_marker=True))))
 
-    return json.dumps(result)
+    updated_id = result[0]["documentId"]
+
+    get_query = "SELECT rid, r.*, m.blockAddress, m.hash, m.metadata FROM {} AS r BY rid " \
+                "INNER JOIN _ql_committed_{} AS m BY mid ON rid = mid " \
+                "WHERE rid = ?"
+    get_query = get_query.format(name, name)
+    cursor = qldb_session.execute_statement(get_query, id)
+
+    parser_result = []
+
+    for cursor_result in cursor:
+        parser_result.append(parse_ion(loads(dumps(cursor_result, binary=False, omit_version_marker=True))))
+
+    if len(parser_result) > 0:
+        parser_result = parser_result[0]
+
+    return json.dumps(parser_result)
 
 
 @app.route('/table/<name>', methods=["POST"])
@@ -271,18 +289,27 @@ def delete_all_tables():
 
 
 def parse_ion(ion_object):
-    parsed = dict()
+    try:
+        parsed = dict()
 
-    for field in ion_object:
-        if ion_object[field].__dict__['ion_type'] == IonType.STRUCT:
-            parsed[field] = parse_ion(ion_object[field])
-        elif ion_object[field].__dict__['ion_type'] == IonType.BLOB:
-            hash_str = re.search('{{(.*)}}', dumps(ion_object[field], binary=False))
+        for field in ion_object:
+            if ion_object[field].__dict__['ion_type'] == IonType.STRUCT:
+                parsed[field] = parse_ion(ion_object[field])
+            elif ion_object[field].__dict__['ion_type'] == IonType.BLOB:
+                hash_str = re.search('{{(.*)}}', dumps(ion_object[field], binary=False))
 
-            if hash_str:
-                parsed[field] = hash_str.group(1)
-        else:
-            parsed[field] = str(ion_object[field])
+                if hash_str:
+                    parsed[field] = hash_str.group(1)
+            elif ion_object[field].__dict__['ion_type'] == IonType.LIST:
+                parsed_struct = []
+                for struct_val in ion_object[field]:
+                    parsed_struct.append(parse_ion(struct_val))
+
+                parsed[field] = parsed_struct
+            else:
+                parsed[field] = str(ion_object[field])
+    except Exception as e:
+        print(str(e))
 
     return parsed
 
