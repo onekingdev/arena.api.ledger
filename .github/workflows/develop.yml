@@ -1,0 +1,33 @@
+name: Develop Deploy
+
+on:
+  push:
+    branches: [ develop ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Zip Project
+      id: zip-project
+      run: zip -r deploy.zip .
+
+    - name: Get Commit Hash
+      id: version-hash
+      run: |
+        echo "::set-output name=hash::${GITHUB_SHA}"
+
+    - name: Deploy to EB
+      uses: einaregilsson/beanstalk-deploy@v10
+      with:
+        aws_access_key: AKIA4HA6BMQTBMXJTE6G
+        aws_secret_key: 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
+        application_name: Arena.ApiLedger.Develop
+        environment_name: Arenaapiledgerdevelop-env
+        version_label: ${{ steps.version-hash.outputs.hash }}
+        region: us-east-1
+        deployment_package: deploy.zip      
+      
