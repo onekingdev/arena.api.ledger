@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, abort, Response
+from flask import Flask, request, jsonify, Response
 import json
 from amazon.ion.simpleion import dumps, loads, IonType
 from qldb_sesssion import session
