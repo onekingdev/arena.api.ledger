@@ -26,7 +26,7 @@ jobs:
         aws_access_key: AKIA4HA6BMQTBMXJTE6G
         aws_secret_key: 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
         application_name: Arena.ApiLedger.Develop
-        environment_name: Arenaapiledgerdevelop-env
+        environment_name: Arena-ApiLedger-Develop
         version_label: ${{ steps.version-hash.outputs.hash }}
         region: us-east-1
         deployment_package: deploy.zip      
