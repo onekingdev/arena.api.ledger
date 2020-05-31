@@ -29,5 +29,14 @@ jobs:
         environment_name: Arena-ApiLedger-Staging
         version_label: ${{ steps.version-hash.outputs.hash }}
         region: us-east-1
-        deployment_package: deploy.zip      
-      
+        deployment_package: deploy.zip
+
+    - name: Slack Notification
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        fields: repo,commit,action,eventName,workflow
+        author_name: ArenaOps
+      env:
+        SLACK_WEBHOOK_URL: https://hooks.slack.com/services/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
+      if: always()

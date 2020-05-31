@@ -31,10 +31,12 @@ jobs:
         region: us-east-1
         deployment_package: deploy.zip      
       
-    - uses: 8398a7/action-slack@v3
+    - name: Slack Notification
+      uses: 8398a7/action-slack@v3
       with:
         status: ${{ job.status }}
         fields: repo,commit,action,eventName,workflow
+        author_name: ArenaOps
       env:
-        SLACK_WEBHOOK_URL: https://hooks.slack.com/services/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
+        SLACK_WEBHOOK_URL: https://hooks.slack.com/services/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
       if: always()
