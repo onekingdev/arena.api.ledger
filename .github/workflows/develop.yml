@@ -23,13 +23,13 @@ jobs:
     - name: Deploy to EB
       uses: einaregilsson/beanstalk-deploy@v10
       with:
-        aws_access_key: AKIA4HA6BMQTBMXJTE6G
-        aws_secret_key: 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
-        application_name: Arena.ApiLedger.Develop
-        environment_name: Arena-ApiLedger-Develop
+        aws_access_key: ${{ secrets.AWS_IAM_KEY_DEVELOP }}
+        aws_secret_key: ${{ secrets.AWS_IAM_SECRET_DEVELOP }}
+        application_name: ${{ secrets.AWS_EB_APP_DEVELOP }}
+        environment_name: ${{ secrets.AWS_EB_ENV_DEVELOP }}
         version_label: ${{ steps.version-hash.outputs.hash }}
-        region: us-east-1
-        deployment_package: deploy.zip      
+        region: ${{ secrets.AWS_REGION_DEVELOP }}
+        deployment_package: deploy.zip
       
     - name: Slack Notification
       uses: 8398a7/action-slack@v3
