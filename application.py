@@ -288,6 +288,11 @@ def delete_all_tables():
     return ''
 
 
+@app.route('/ping', methods=["GET"])
+def ping():
+    return "pong"
+
+
 def parse_ion(ion_object):
     try:
         parsed = dict()
