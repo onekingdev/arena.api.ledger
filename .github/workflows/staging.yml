@@ -32,11 +32,14 @@ jobs:
         deployment_package: deploy.zip
 
     - name: Slack Notification
-      uses: 8398a7/action-slack@v3
+      uses: wei/curl@v1
       with:
-        status: ${{ job.status }}
-        fields: repo,commit,action,eventName,workflow
-        author_name: ArenaOps
-      env:
-        SLACK_WEBHOOK_URL: https://hooks.slack.com/services/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
+        args: -X POST ${{ secrets.ARENA_API_SLACK_ENDPOINT }}
+          --data-urlencode 'repo_owner=${{github.repository_owner}}'
+          --data-urlencode 'repo=${{github.repository}}'
+          --data-urlencode 'commit=${{github.sha}}'
+          --data-urlencode 'status=${{job.status}}'
+          --data-urlencode 'workflow=${{github.workflow}}'
+          --data-urlencode 'actor=${{github.event.head_commit.author.username}}'
+          --data-urlencode 'repo_url=${{github.event.repository.url}}'
       if: always()
