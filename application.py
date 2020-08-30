@@ -5,11 +5,11 @@ from qldb_sesssion import session
 from middlewate import Middleware
 import re
 
-app = Flask(__name__)
-app.wsgi_app = Middleware(app.wsgi_app)
+application = Flask(__name__)
+application.wsgi_app = Middleware(application.wsgi_app)
 
 
-@app.route('/tables')
+@application.route('/tables')
 def tables():
     tables = []
 
@@ -23,7 +23,7 @@ def tables():
     return json.dumps(tables)
 
 
-@app.route('/table/<name>/documents', methods=["GET"])
+@application.route('/table/<name>/documents', methods=["GET"])
 def table_documents(name):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -53,7 +53,7 @@ def table_documents(name):
     return jsonify(result)
 
 
-@app.route('/table/<name>/document', methods=["POST"])
+@application.route('/table/<name>/document', methods=["POST"])
 def insert_data(name):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -93,7 +93,7 @@ def insert_data(name):
     return jsonify(result)
 
 
-@app.route('/table/<name>/document/<id>', methods=["GET"])
+@application.route('/table/<name>/document/<id>', methods=["GET"])
 def get_document(name, id):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -154,7 +154,7 @@ def get_document(name, id):
     return Response(json.dumps(response), mimetype='application/json')
 
 
-@app.route('/table/<name>/document/<id>', methods=["PUT"])
+@application.route('/table/<name>/document/<id>', methods=["PUT"])
 def update_document(name, id):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -223,7 +223,7 @@ def update_document(name, id):
     return json.dumps(parser_result)
 
 
-@app.route('/table/<name>', methods=["POST"])
+@application.route('/table/<name>', methods=["POST"])
 def create_table(name):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -259,7 +259,7 @@ def create_table(name):
     return ''
 
 
-@app.route('/table/<name>', methods=["DELETE"])
+@application.route('/table/<name>', methods=["DELETE"])
 def delete_table(name):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -275,7 +275,7 @@ def delete_table(name):
     return ''
 
 
-@app.route('/tables', methods=["DELETE"])
+@application.route('/tables', methods=["DELETE"])
 def delete_all_tables():
     try:
         qldb_session = session()
@@ -288,7 +288,7 @@ def delete_all_tables():
     return ''
 
 
-@app.route('/ping', methods=["GET"])
+@application.route('/ping', methods=["GET"])
 def ping():
     return "pong"
 
@@ -320,4 +320,4 @@ def parse_ion(ion_object):
 
 
 if __name__ == '__main__':
-    app.run(port=5001)
+    application.run(port=5001)
