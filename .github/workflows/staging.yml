@@ -31,6 +31,10 @@ jobs:
         region: ${{ secrets.AWS_REGION_STAGING }}
         deployment_package: deploy.zip
 
+    - name: Dump GitHub context
+      env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+        
     - name: Slack Notification
       uses: wei/curl@v1
       with:
