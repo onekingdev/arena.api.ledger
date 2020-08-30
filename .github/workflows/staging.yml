@@ -31,11 +31,6 @@ jobs:
         region: ${{ secrets.AWS_REGION_STAGING }}
         deployment_package: deploy.zip
 
-    - name: Dump GitHub context
-      env:
-        GITHUB_CONTEXT: ${{ toJson(github) }}
-      run: echo "$GITHUB_CONTEXT"
-
     - name: Slack Notification
       uses: wei/curl@v1
       with:
@@ -45,6 +40,6 @@ jobs:
           --data-urlencode 'commit=${{github.sha}}'
           --data-urlencode 'status=${{job.status}}'
           --data-urlencode 'workflow=${{github.workflow}}'
-          --data-urlencode 'actor=${{github.event.pusher.name}}'
+          --data-urlencode 'actor=${{github.event.head_commit.author.username}}'
           --data-urlencode 'repo_url=${{github.event.repository.url}}'
       if: always()
