@@ -5,11 +5,11 @@ from qldb_sesssion import session
 from middlewate import Middleware
 import re
 
-application = Flask(__name__)
-application.wsgi_app = Middleware(application.wsgi_app)
+app = Flask(__name__)
+app.wsgi_app = Middleware(app.wsgi_app)
 
 
-@application.route('/tables')
+@app.route('/tables')
 def tables():
     tables = []
 
@@ -23,7 +23,7 @@ def tables():
     return json.dumps(tables)
 
 
-@application.route('/table/<name>/documents', methods=["GET"])
+@app.route('/table/<name>/documents', methods=["GET"])
 def table_documents(name):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -53,7 +53,7 @@ def table_documents(name):
     return jsonify(result)
 
 
-@application.route('/table/<name>/document', methods=["POST"])
+@app.route('/table/<name>/document', methods=["POST"])
 def insert_data(name):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -87,13 +87,27 @@ def insert_data(name):
         if len(result) == 1:
             result = result[0]
 
+        history_query = "SELECT * FROM history( {} ) AS h WHERE h.metadata.id = ?"
+        history_query = history_query.format(name)
+
+        history_cursor = qldb_session.execute_statement(history_query, id)
+
+        history = []
+
+        for row in history_cursor:
+            history.append(parse_ion(loads(dumps(row, binary=False, omit_version_marker=True))))
+
+        response = dict()
+        response['document'] = result
+        response['history'] = history
+
     except Exception as e:
         return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
 
-    return jsonify(result)
+    return jsonify(response)
 
 
-@application.route('/table/<name>/document/<id>', methods=["GET"])
+@app.route('/table/<name>/document/<id>', methods=["GET"])
 def get_document(name, id):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -114,9 +128,9 @@ def get_document(name, id):
 
         select_data = ', '.join(formatted_data)
 
-    query = "SELECT rid, {}, m.blockAddress, m.hash, m.metadata FROM {} AS r BY rid " \
-            "INNER JOIN _ql_committed_{} AS m BY mid ON rid = mid " \
-            "WHERE rid = ?"
+    query = "SELECT id, {}, m.blockAddress, m.hash, m.metadata FROM {} AS r BY id " \
+            "INNER JOIN _ql_committed_{} AS m BY mid ON id = mid " \
+            "WHERE id = ?"
     query = query.format(select_data, name, name)
 
     try:
@@ -151,10 +165,10 @@ def get_document(name, id):
     response['history'] = history
 
     # return json.dumps(response)
-    return Response(json.dumps(response), mimetype='application/json')
+    return Response(json.dumps(response), mimetype='app/json')
 
 
-@application.route('/table/<name>/document/<id>', methods=["PUT"])
+@app.route('/table/<name>/document/<id>', methods=["PUT"])
 def update_document(name, id):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -167,7 +181,7 @@ def update_document(name, id):
     if data is None:
         return Response(u'Update data is required', mimetype='text/plain', status=400)
 
-    select_query = "SELECT r.* FROM {} AS r BY rid WHERE rid = ?".format(name)
+    select_query = "SELECT r.* FROM {} AS r BY id WHERE id = ?".format(name)
 
     try:
         qldb_session = session()
@@ -185,7 +199,14 @@ def update_document(name, id):
             processed_result = dict()
 
             for res in result:
-                processed_result[res] = str(result[res])
+                if result[res].__dict__['ion_type'] == IonType.LIST:
+                    parsed_struct = []
+                    for struct_val in result[res]:
+                        parsed_struct.append(parse_ion(struct_val))
+
+                    processed_result[res] = parsed_struct
+                else:
+                    processed_result[res] = str(result[res])
 
             for field in data:
                 processed_result[field] = data[field]
@@ -194,7 +215,7 @@ def update_document(name, id):
 
         data = loads(dumps(data))
 
-        query = "UPDATE {} AS p BY rid SET p = ? WHERE rid = ?".format(name)
+        query = "UPDATE {} AS p BY id SET p = ? WHERE id = ?".format(name)
         cursor = qldb_session.execute_statement(query, data, id)
     except Exception as e:
         return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
@@ -204,11 +225,9 @@ def update_document(name, id):
     for row in cursor:
         result.append(parse_ion(loads(dumps(row, binary=False, omit_version_marker=True))))
 
-    updated_id = result[0]["documentId"]
-
-    get_query = "SELECT rid, r.*, m.blockAddress, m.hash, m.metadata FROM {} AS r BY rid " \
-                "INNER JOIN _ql_committed_{} AS m BY mid ON rid = mid " \
-                "WHERE rid = ?"
+    get_query = "SELECT id, r.*, m.blockAddress, m.hash, m.metadata FROM {} AS r BY id " \
+                "INNER JOIN _ql_committed_{} AS m BY mid ON id = mid " \
+                "WHERE id = ?"
     get_query = get_query.format(name, name)
     cursor = qldb_session.execute_statement(get_query, id)
 
@@ -220,10 +239,27 @@ def update_document(name, id):
     if len(parser_result) > 0:
         parser_result = parser_result[0]
 
-    return json.dumps(parser_result)
+    history_query = "SELECT * FROM history( {} ) AS h WHERE h.metadata.id = ?"
+    history_query = history_query.format(name)
+
+    try:
+        history_cursor = qldb_session.execute_statement(history_query, id)
+    except Exception as e:
+        return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
+
+    history = []
+
+    for row in history_cursor:
+        history.append(parse_ion(loads(dumps(row, binary=False, omit_version_marker=True))))
+
+    response = dict()
+    response['document'] = parser_result
+    response['history'] = history
+
+    return json.dumps(response)
 
 
-@application.route('/table/<name>', methods=["POST"])
+@app.route('/table/<name>', methods=["POST"])
 def create_table(name):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -259,7 +295,7 @@ def create_table(name):
     return ''
 
 
-@application.route('/table/<name>', methods=["DELETE"])
+@app.route('/table/<name>', methods=["DELETE"])
 def delete_table(name):
     if len(name) == 0:
         return Response(u'Table name is required', mimetype='text/plain', status=400)
@@ -275,7 +311,7 @@ def delete_table(name):
     return ''
 
 
-@application.route('/tables', methods=["DELETE"])
+@app.route('/tables', methods=["DELETE"])
 def delete_all_tables():
     try:
         qldb_session = session()
@@ -288,7 +324,7 @@ def delete_all_tables():
     return ''
 
 
-@application.route('/ping', methods=["GET"])
+@app.route('/ping', methods=["GET"])
 def ping():
     return "pong"
 
@@ -320,4 +356,4 @@ def parse_ion(ion_object):
 
 
 if __name__ == '__main__':
-    application.run(port=5001)
+    app.run(port=5001)
