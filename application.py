@@ -55,17 +55,17 @@ def table_documents(name):
 
 @application.route('/table/<name>/document', methods=["POST"])
 def insert_data(name):
-    if len(name) == 0:
-        return Response(u'Table name is required', mimetype='text/plain', status=400)
-
-    data = request.get_json()
-
-    if data is None:
-        return Response(u'Insert data is required', mimetype='text/plain', status=400)
-
-    statement = 'INSERT INTO {} ?'.format(name)
-
     try:
+        if len(name) == 0:
+            return Response(u'Table name is required', mimetype='text/plain', status=400)
+
+        data = request.get_json()
+
+        if data is None:
+            return Response(u'Insert data is required', mimetype='text/plain', status=400)
+
+        statement = 'INSERT INTO {} ?'.format(name)
+
         qldb_session = session()
         cursor = qldb_session.execute_statement(statement, loads(dumps(data)))
         ret_val = list(map(lambda x: x.get('documentId'), cursor))
@@ -101,10 +101,13 @@ def insert_data(name):
         response['document'] = result
         response['history'] = history
 
+        return jsonify(response)
     except Exception as e:
-        return Response(u'QLDB error: ' + str(e), mimetype='text/plain', status=400)
+        f = open("demofile2.txt", "a")
+        f.write(str(e))
+        f.close()
 
-    return jsonify(response)
+
 
 
 @application.route('/table/<name>/document/<id>', methods=["GET"])
