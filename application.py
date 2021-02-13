@@ -207,6 +207,8 @@ def update_document(name, id):
                     processed_result[res] = parsed_struct
                 elif result[res].__dict__['ion_type'] == IonType.NULL:
                     processed_result[res] = None
+                elif result[res].__dict__['ion_type'] == IonType.STRUCT:
+                    processed_result[res] = parse_ion(result[res])
                 else:
                     processed_result[res] = str(result[res])
 
